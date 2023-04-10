@@ -14,6 +14,8 @@
 #include <libavutil/imgutils.h>
 
 #define NUM_COLORS 216
+#define BRIGHTNESS 2
+#define COLOR_RANGE (unsigned int)(51 * BRIGHTNESS)
 
 int main(int argc, char *argv[])
 {
@@ -91,18 +93,19 @@ int main(int argc, char *argv[])
 
     frame = av_frame_alloc();
 
-    int width , height, cont = 100;
+    int width, height, cont = 50;
 
     if (codec_ctx->height < codec_ctx->width)
     {
         width = cont;
         height = width * codec_ctx->height / codec_ctx->width;
-    } else {
+    }
+    else
+    {
         height = cont;
         width = height * codec_ctx->width / codec_ctx->height;
     }
 
-    printf("%d %d\n", width, height);
     AVFrame *out_frame = NULL;
 
     out_frame = av_frame_alloc();
@@ -134,9 +137,9 @@ int main(int argc, char *argv[])
             {
                 for (int b = 0; b <= 5; b++)
                 {
-                    int r_val = r * 72;
-                    int g_val = g * 72;
-                    int b_val = b * 72;
+                    int r_val = r * COLOR_RANGE;
+                    int g_val = g * COLOR_RANGE;
+                    int b_val = b * COLOR_RANGE;
                     init_color(color_num, r_val, g_val, b_val);
                     init_pair(color_num + 1, COLOR_BLACK, color_num);
                     color_num++;
@@ -195,10 +198,10 @@ int main(int argc, char *argv[])
                         if (COLORS >= NUM_COLORS)
                         {
                             // 使用 216 种颜色
-                            int r_val = round(r * 5.0 / 255.0) * 72;
-                            int g_val = round(g * 5.0 / 255.0) * 72;
-                            int b_val = round(b * 5.0 / 255.0) * 72;
-                            color_num = r_val / 72 * 36 + g_val / 72 * 6 + b_val / 72 + 1;
+                            int r_val = round(r * 5.0 / 255.0) * COLOR_RANGE;
+                            int g_val = round(g * 5.0 / 255.0) * COLOR_RANGE;
+                            int b_val = round(b * 5.0 / 255.0) * COLOR_RANGE;
+                            color_num = r_val / COLOR_RANGE * 36 + g_val / COLOR_RANGE * 6 + b_val / COLOR_RANGE + 1;
                         }
                         else
                         {
@@ -247,7 +250,7 @@ int main(int argc, char *argv[])
                     }
                 }
                 refresh();
-                // getch();
+                getch();
                 av_frame_unref(frame);
             }
         }
