@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
@@ -12,10 +13,18 @@
 #include <libswscale/swscale.h>
 #include <libswresample/swresample.h>
 #include <libavutil/imgutils.h>
+#include <sys/timerfd.h>
+#include <sys/select.h>
+#include <time.h>
 
 #define NUM_COLORS 216
-#define BRIGHTNESS 2
+#define BRIGHTNESS 2.0
 #define COLOR_RANGE (unsigned int)(51 * BRIGHTNESS)
+
+#define BLOCK_ROWS 1
+#define BLOCK_COLS 2
+
+#define SPEED_UP 2.0
 
 int main(int argc, char *argv[])
 {
@@ -122,6 +131,27 @@ int main(int argc, char *argv[])
     sws_ctx = sws_getContext(codec_ctx->width, codec_ctx->height, codec_ctx->pix_fmt,
                              width, height, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
 
+    int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+    if (timer_fd == -1)
+    {
+        perror("Failed to create timerfd");
+        exit(EXIT_FAILURE);
+    }
+    double fps = av_q2d(fmt_ctx->streams[video_stream_idx]->r_frame_rate) * SPEED_UP;
+    struct itimerspec timer_spec = {
+        .it_interval = {0, (1000000 / fps) * 1000},
+        .it_value = {0, (1000000 / fps) * 1000}};
+    if (timerfd_settime(timer_fd, 0, &timer_spec, NULL) == -1)
+    {
+        perror("Failed to set timerfd time");
+        exit(EXIT_FAILURE);
+    }
+
+    // 监视 timerfd 文件描述符并等待计时器超时事件的发生
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(timer_fd, &fds);
+
     // Initialize ncurses
     initscr();
     start_color();
@@ -169,6 +199,18 @@ int main(int argc, char *argv[])
 
             while (ret >= 0)
             {
+                int nfds = select(timer_fd + 1, &fds, NULL, NULL, NULL);
+                if (nfds == -1)
+                {
+                    perror("Failed to select on timerfd");
+                    exit(EXIT_FAILURE);
+                }
+                uint64_t data;
+                if (read(timer_fd, &data, sizeof(uint64_t)) != sizeof(uint64_t))
+                {
+                    perror("Failed to read timerfd");
+                    exit(EXIT_FAILURE);
+                }
                 ret = avcodec_receive_frame(codec_ctx, frame);
                 if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                 {
@@ -237,11 +279,11 @@ int main(int argc, char *argv[])
                         }
 
                         attron(COLOR_PAIR(color_num));
-                        for (int k = 0; k < 1; k++)
+                        for (int k = 0; k < BLOCK_ROWS; k++)
                         {
-                            for (int l = 0; l < 2; l++)
+                            for (int l = 0; l < BLOCK_COLS; l++)
                             {
-                                mvaddch(k + y * 1, l + x * 2, ' ');
+                                mvaddch(k + y * BLOCK_ROWS, l + x * BLOCK_COLS, ' ');
                             }
                         }
                         // mvaddch(y, x, ' ');
@@ -250,7 +292,7 @@ int main(int argc, char *argv[])
                     }
                 }
                 refresh();
-                getch();
+                // getch();
                 av_frame_unref(frame);
             }
         }
