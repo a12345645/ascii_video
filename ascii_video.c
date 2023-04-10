@@ -24,7 +24,7 @@
 #define BLOCK_ROWS 1
 #define BLOCK_COLS 2
 
-#define SPEED_UP 2.0
+#define SPEED_UP 4.0
 
 int main(int argc, char *argv[])
 {
@@ -102,9 +102,19 @@ int main(int argc, char *argv[])
 
     frame = av_frame_alloc();
 
-    int width, height, cont = 50;
+    // Initialize ncurses
+    initscr();
+    start_color();
 
-    if (codec_ctx->height < codec_ctx->width)
+    int terminal_row, terminal_col;
+    getmaxyx(stdscr, terminal_row, terminal_col);
+    printf("width %d h %d\n", terminal_row, terminal_col);
+    terminal_row /= BLOCK_ROWS;
+    terminal_col /= BLOCK_COLS;
+
+    int width, height, cont = ((terminal_row < terminal_col) ? terminal_row : terminal_col);
+
+    if (codec_ctx->height > codec_ctx->width)
     {
         width = cont;
         height = width * codec_ctx->height / codec_ctx->width;
@@ -114,6 +124,8 @@ int main(int argc, char *argv[])
         height = cont;
         width = height * codec_ctx->width / codec_ctx->height;
     }
+
+    int row_offset = (terminal_row - height) * BLOCK_ROWS / 2, col_offset = (terminal_col - width) * BLOCK_COLS / 2;
 
     AVFrame *out_frame = NULL;
 
@@ -152,9 +164,6 @@ int main(int argc, char *argv[])
     FD_ZERO(&fds);
     FD_SET(timer_fd, &fds);
 
-    // Initialize ncurses
-    initscr();
-    start_color();
     int index = 0;
 
     if (COLORS >= NUM_COLORS)
@@ -283,7 +292,7 @@ int main(int argc, char *argv[])
                         {
                             for (int l = 0; l < BLOCK_COLS; l++)
                             {
-                                mvaddch(k + y * BLOCK_ROWS, l + x * BLOCK_COLS, ' ');
+                                mvaddch(row_offset + k + y * BLOCK_ROWS, col_offset + l + x * BLOCK_COLS, ' ');
                             }
                         }
                         // mvaddch(y, x, ' ');
