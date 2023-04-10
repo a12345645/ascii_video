@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <ncurses.h>
+#include <unistd.h>
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -14,8 +15,6 @@
 #include <libavutil/imgutils.h>
 
 #define NUM_COLORS 216
-#define BRIGHTNESS 2
-#define COLOR_RANGE (unsigned int)(51 * BRIGHTNESS)
 
 int main(int argc, char *argv[])
 {
@@ -24,9 +23,10 @@ int main(int argc, char *argv[])
     AVCodec *codec = NULL;
     AVPacket pkt;
     AVFrame *frame = NULL;
+	AVDictionary *options = NULL;
     struct SwsContext *sws_ctx = NULL;
     int video_stream_idx = -1;
-    int ret, got_frame;
+    int ret, got_frame, fps;
 
     if (argc < 2)
     {
@@ -35,13 +35,12 @@ int main(int argc, char *argv[])
     }
 
     av_register_all();
-
-    if ((ret = avformat_open_input(&fmt_ctx, argv[1], NULL, NULL)) < 0)
+    if ((ret = avformat_open_input(&fmt_ctx, argv[1], NULL, &options)) < 0)
     {
         fprintf(stderr, "Could not open input file '%s': %s\n", argv[1], av_err2str(ret));
         exit(1);
     }
-
+	
     if ((ret = avformat_find_stream_info(fmt_ctx, NULL)) < 0)
     {
         fprintf(stderr, "Could not find stream information: %s\n", av_err2str(ret));
@@ -65,6 +64,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+	fps = av_q2d(fmt_ctx->streams[video_stream_idx]->r_frame_rate);///
+	
     codec = avcodec_find_decoder(fmt_ctx->streams[video_stream_idx]->codecpar->codec_id);
     if (!codec)
     {
@@ -93,19 +94,18 @@ int main(int argc, char *argv[])
 
     frame = av_frame_alloc();
 
-    int width, height, cont = 50;
+    int width , height, cont = 100;
 
     if (codec_ctx->height < codec_ctx->width)
     {
         width = cont;
         height = width * codec_ctx->height / codec_ctx->width;
-    }
-    else
-    {
+    } else {
         height = cont;
         width = height * codec_ctx->width / codec_ctx->height;
     }
 
+    printf("%d %d\n", width, height);
     AVFrame *out_frame = NULL;
 
     out_frame = av_frame_alloc();
@@ -137,9 +137,9 @@ int main(int argc, char *argv[])
             {
                 for (int b = 0; b <= 5; b++)
                 {
-                    int r_val = r * COLOR_RANGE;
-                    int g_val = g * COLOR_RANGE;
-                    int b_val = b * COLOR_RANGE;
+                    int r_val = r * 72;
+                    int g_val = g * 72;
+                    int b_val = b * 72;
                     init_color(color_num, r_val, g_val, b_val);
                     init_pair(color_num + 1, COLOR_BLACK, color_num);
                     color_num++;
@@ -158,8 +158,10 @@ int main(int argc, char *argv[])
 
     while (av_read_frame(fmt_ctx, &pkt) >= 0)
     {
+		
         if (pkt.stream_index == video_stream_idx)
         {
+			usleep(1000*1000/fps);
             ret = avcodec_send_packet(codec_ctx, &pkt);
             if (ret < 0)
             {
@@ -198,10 +200,10 @@ int main(int argc, char *argv[])
                         if (COLORS >= NUM_COLORS)
                         {
                             // 使用 216 种颜色
-                            int r_val = round(r * 5.0 / 255.0) * COLOR_RANGE;
-                            int g_val = round(g * 5.0 / 255.0) * COLOR_RANGE;
-                            int b_val = round(b * 5.0 / 255.0) * COLOR_RANGE;
-                            color_num = r_val / COLOR_RANGE * 36 + g_val / COLOR_RANGE * 6 + b_val / COLOR_RANGE + 1;
+                            int r_val = round(r * 5.0 / 255.0) * 72;
+                            int g_val = round(g * 5.0 / 255.0) * 72;
+                            int b_val = round(b * 5.0 / 255.0) * 72;
+                            color_num = r_val / 72 * 36 + g_val / 72 * 6 + b_val / 72 + 1;
                         }
                         else
                         {
@@ -250,7 +252,7 @@ int main(int argc, char *argv[])
                     }
                 }
                 refresh();
-                getch();
+                // getch();
                 av_frame_unref(frame);
             }
         }
@@ -260,7 +262,8 @@ int main(int argc, char *argv[])
     av_frame_free(&out_frame);
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&fmt_ctx);
-
+	av_dict_free(&options);
+	
     refresh();
     endwin();
 }
