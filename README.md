@@ -9,8 +9,12 @@ This program ascii_video is a simple tool that converts a video file into ASCII 
 To install the dependencies on Ubuntu/Debian, run the following commands:
 
 ```bash=
-sudo apt install ffmpeg
+sudo apt-get install ffmpeg
 sudo apt-get install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libncurses-dev
+```
+On CentOS/Red Hat:
+```
+sudo dnf install ffmpeg-devel ncurses-devel
 ```
 # Building
 To build the program, run the following command in the terminal:
