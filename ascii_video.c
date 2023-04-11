@@ -108,21 +108,21 @@ int main(int argc, char *argv[])
 
     int terminal_row, terminal_col;
     getmaxyx(stdscr, terminal_row, terminal_col);
-    printf("width %d h %d\n", terminal_row, terminal_col);
     terminal_row /= BLOCK_ROWS;
     terminal_col /= BLOCK_COLS;
 
-    int width, height, cont = ((terminal_row < terminal_col) ? terminal_row : terminal_col);
+    double row_aspect_ratio = (double)terminal_row / codec_ctx->height, col_aspect_ratio = (double)terminal_col / codec_ctx->width;
+    int width, height;
 
-    if (codec_ctx->height > codec_ctx->width)
+    if (row_aspect_ratio < col_aspect_ratio)
     {
-        width = cont;
-        height = width * codec_ctx->height / codec_ctx->width;
+        width = row_aspect_ratio * codec_ctx->width;
+        height = row_aspect_ratio * codec_ctx->height;
     }
     else
     {
-        height = cont;
-        width = height * codec_ctx->width / codec_ctx->height;
+        width = col_aspect_ratio * codec_ctx->width;
+        height = col_aspect_ratio * codec_ctx->height;
     }
 
     int row_offset = (terminal_row - height) * BLOCK_ROWS / 2, col_offset = (terminal_col - width) * BLOCK_COLS / 2;
@@ -212,13 +212,13 @@ int main(int argc, char *argv[])
                 if (nfds == -1)
                 {
                     perror("Failed to select on timerfd");
-                    exit(EXIT_FAILURE);
+                    goto closed;
                 }
                 uint64_t data;
                 if (read(timer_fd, &data, sizeof(uint64_t)) != sizeof(uint64_t))
                 {
                     perror("Failed to read timerfd");
-                    exit(EXIT_FAILURE);
+                    goto closed;
                 }
                 ret = avcodec_receive_frame(codec_ctx, frame);
                 if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
                 else if (ret < 0)
                 {
                     fprintf(stderr, "Error during decoding: %s\n", av_err2str(ret));
-                    exit(1);
+                    goto closed;
                 }
 
                 // Convert the frame to grayscale and scale it
@@ -307,6 +307,7 @@ int main(int argc, char *argv[])
         }
         av_packet_unref(&pkt);
     }
+closed:
     av_frame_free(&frame);
     av_frame_free(&out_frame);
     avcodec_free_context(&codec_ctx);
