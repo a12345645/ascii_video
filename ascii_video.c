@@ -16,6 +16,7 @@
 #include <sys/timerfd.h>
 #include <sys/select.h>
 #include <time.h>
+#include <signal.h>
 
 #define NUM_COLORS 216
 #define BRIGHTNESS 2.0
@@ -23,6 +24,17 @@
 
 #define BLOCK_ROWS 1
 #define BLOCK_COLS 2
+
+void sigint_handler(int sig)
+{
+    // 将颜色模式设置为默认模式
+    use_default_colors();
+
+    // 将前景色和背景色都设置为默认颜色
+    assume_default_colors(-1, -1);
+    endwin();
+    // 可以在這裡進行相應的處理
+}
 
 #define SPEED_UP 4.0
 
@@ -105,6 +117,8 @@ int main(int argc, char *argv[])
     // Initialize ncurses
     initscr();
     start_color();
+
+    signal(SIGINT, sigint_handler);
 
     int terminal_row, terminal_col;
     getmaxyx(stdscr, terminal_row, terminal_col);
@@ -312,7 +326,6 @@ closed:
     av_frame_free(&out_frame);
     avcodec_free_context(&codec_ctx);
     avformat_close_input(&fmt_ctx);
-
-    refresh();
+    start_color();
     endwin();
 }
